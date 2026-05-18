@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Capacidade de sala de espera</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 500px; margin: 2rem auto; }
+        .error { color: red; }
+        .resultado { font-weight: bold; margin-top: 1rem; }
+        input { width: 100%; padding: 0.4rem; margin-bottom: 0.5rem; }
+        button { padding: 0.5rem 1.5rem; }
+
+        .content {
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+<div id="app">
+    <h1>Contagem de entrada e saída de passageiros:</h1>
+    <div>
+        <label>Entrada passageiros:</label>
+        <input v-model="entradasString" placeholder='Ex: [1,2,3]'>
+    </div>
+    <div>
+        <label>Saída de passageiros:</label>
+        <input v-model="saidasString" placeholder='Ex: [2,3,4]'>
+    </div>
+    <p class="error" v-if="erro">{{ erro }}</p>
+    <button @click="enviar">Verificar</button>
+    <div class="resultado" v-if="resultado !== null">
+        A quantidade máxima de passageiros presentes nestes períodos é: {{ resultado }}
+    </div>
+    <br>
+    <br>
+    <details>
+        <summary>Clique aqui para exibir as informações de uso e descrição da solução.</summary>
+        <div class="content">
+            <p>Esta solução exibe a quantidade de passageiros que estiveram ocupando a sala de espera durante o mesmo período de tempo.</p> 
+            <p>Para fins de simplificar a implementar da solução foram consideradas apenas horas de entrada e saída dos passageiros, ou seja, não serão aceitas por enquanto valores de minutos e segundos referntes aos horarios.</p>
+            <p>Portanto, esta solução irá considerar os intervalos de tempo especificados nos campos de texto de <strong>entrada</strong> e <strong>saída</strong>.</p>
+            <p>A orientação para inserir as informações corretamente é que se insita primeiramente todas as horas em que cada passageiro na sala de espera, e no campo de texto abaixo de saídas sejam inseridas todas as horas de saída de cada passageiro da saída.</p>
+            <p>Futuramente alterações podem ser feitas para melhores adaptações ao formato de inserir os dados dos passeiros, esta é uma prova de conceito para esta solução.</p>
+        </div>    
+    </div>
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                entradasString: '',
+                saidasString: '',
+                erro: '',
+                resultado: null
+            };
+        },
+        methods: {
+            parseArray(str) {
+                try {
+                    const arr = JSON.parse(str);
+                    if (!Array.isArray(arr)) throw new Error('Não é um arranjo');
+                    if (arr.some(e => typeof e !== 'number'))
+                        throw new Error('Elementos devem ser números');
+                    return arr;
+                } catch (e) {
+                    throw new Error('Formato inválido. Use algo como [1,2,3]');
+                }
+            },
+            async enviar() {
+                this.erro = '';
+                this.resultado = null;
+
+                let entradas, saidas;
+                try {
+                    entradas = this.parseArray(this.entradasString);
+                    saidas = this.parseArray(this.saidasString);
+                } catch (e) {
+                    this.erro = e.message;
+                    return;
+                }
+
+                if (entradas.length !== saidas.length) {
+                    this.erro = 'Os arranjos devem ter tamanhos iguais';
+                    return;
+                }
+
+                try {
+                    const resp = await fetch('/api/maxSimPassengers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ entradas, saidas })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                        this.erro = data.error || 'Erro no servidor';
+                    } else {
+                        this.resultado = data.result;
+                    }
+                } catch (e) {
+                    this.erro = 'Falha na comunicação com o servidor';
+                }
+            }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
